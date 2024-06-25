@@ -98,11 +98,12 @@ def hertz(i, E, nu, r):
     force = 4/3 * E / (1 - nu**2) * np.sqrt(r)*i**1.5 * factor
     # make nan values zero
     force[np.isnan(force)] = 0
-    return force
+    return force*10**-6
 
 # Johnson-Kendall-Roberts model for indentation
 # (3) https://lizidelcidphd.com/2017/07/07/the-simplified-johnson-kendall-roberts-model/
 def jkr(i, E, nu, gamma, r):
+    # Corrigir Formula !!!!!!
     """Johnson-Kendall-Roberts model for indentation.
     
     Parameters
@@ -123,11 +124,22 @@ def jkr(i, E, nu, gamma, r):
     float
         Contact force.
     """
+    E = E * 10**3 # kPa to Pa
+    i = i * 10**-9 # nm to m
+    r = r * 10**-9 # nm to m
+    gamma = gamma * 10**-6 # microJ/m^2 to J/m^2
+    E_eff = E / (1 - nu**2)
+    K = 4/3 * E_eff
+    Ua = np.sqrt(6*np.pi*gamma)
     # JKR force formula in (3)
-    force = E * r **0.5 * i**1.5 - gamma * E**0.5 * r**0.75 * i**0.75
+    force = K * r **0.5 * i**1.5 - Ua * K**0.5 * r**0.75 * i**0.75
     # make nan values zero
-    force[np.isnan(force)] = 0
-    return force
+    print(force.dtype)
+    force = np.copy(force)
+    print(force.dtype)
+    force[np.isnan(force)] = 0 # This is normally uncommented!!!!!!!!!!!!
+    # return force*10**-6
+    return force*10**9
 
 
 # ## Parameter definition
@@ -136,13 +148,31 @@ def jkr(i, E, nu, gamma, r):
 
 
 # resolution of the map
-res = 50
+'''res = 150
 # random values
 size = res * res
+
+# Seed (if needed)
+# np.random.seed(42)
+
 # Young's modulus [kPa] - random values following a normal distribution
     #loc: mean/center of distribution
     #scale: std
-E = abs(np.random.normal(loc=1.0, scale=0.3, size=size))
+# Normal distribution: 
+# E = abs(np.random.normal(loc=1.3, scale=1., size=size))
+
+# Uniform distribution:
+E = abs(np.random.uniform(low=0.3, high=10., size=size))
+
+# Triangular distrbution
+# E = np.random.triangular(left=0.2, mode=1.8, right=10, size=size)
+
+#Beta distribution:
+a = 1.5
+b = 4.5
+E = np.random.beta(a, b, size=size)
+E *= 10
+
 # Poisson's ratio 
 nu = 0.5
 # surface energy
@@ -150,7 +180,7 @@ nu = 0.5
 gamma = abs(np.random.normal(loc=0.1, scale=0.03, size=size))
 # gamma = 0.1
 # radius of the indenter
-r = 1.0
+r = 1980.0 # (nm)'''
 
 
 # In[6]:
@@ -158,23 +188,26 @@ r = 1.0
 
 # no contact approach. less points
 #linspace(p1, p2, n_pts)
-no_contact = np.linspace(-10, 0, 3)
+'''no_contact = np.linspace(-800, 0, 3)
 
-'''DISPLACEMENT VECTORS'''
-xmin, xmax, npts = 0, 4, 20
+# DISPLACEMENT VECTORS
+xmin, xmax, npts = 0, 250, 50
 
-'''Uniformly distributed disp. vectors'''
+# Uniformly distributed disp. vectors
 # indentation depth. more points
-contact = np.linspace(xmin, xmax, npts)
+contact = np.linspace(xmin, xmax, npts+1)
 # approach and withdraw
 approach = np.concatenate([no_contact[:-1], contact])
 withdraw = np.flip(approach)
 ramp = np.concatenate([approach, withdraw])
 
-'''Randomly distributed disp. vectors'''
+# Randomly distributed disp. vectors
+# Seed (if needed)
+# np.random.seed(42)
+
 rnd_contact_list = [contact]
 for _ in range(size-1):
-    aux = np.random.random(npts).cumsum()
+    aux = np.random.random(npts+1).cumsum()
     aux = (aux-aux.min()) / aux.ptp()     #... .ptp(): peak to peak, i.e., xmax-xmin
     aux = (xmax-xmin)*aux + xmin
     rnd_contact_list.append(aux)
@@ -187,7 +220,7 @@ half_cycle = 2
 t_approach = half_cycle*((approach - approach.min(axis=0)) / (approach.max(axis=0) - approach.min(axis=0)))
 t_withdraw = half_cycle*((withdraw - withdraw.max(axis=0)) / (withdraw.min(axis=0) - withdraw.max(axis=0)))+max(t_approach)
 t = np.concatenate([t_approach, t_withdraw])
-fig, (ax1, ax2, ax3) = plt.subplots(1,3, figsize=(12,4))
+fig, (ax1, ax2, ax3) = plt.subplots(1,3, figsize=(14,4))
 ax1.set_xlabel('Time (s)')
 ax1.set_ylabel('Displacement')
 ax1.plot(t, ramp)
@@ -196,7 +229,7 @@ ax2.set_ylabel('Frequency')
 ax2.hist(E, 20)
 ax3.set_xlabel('$\gamma$')
 ax3.set_ylabel('Frequency')
-ax3.hist(gamma, 20)
+ax3.hist(gamma, 20)'''
 
 
 # ## Initial df
@@ -205,7 +238,7 @@ ax3.hist(gamma, 20)
 
 
 # construct dataframe
-df = pd.DataFrame()
+'''df = pd.DataFrame()
 # 'E' and 'gamma' arrays to list:
 df['E'] = E.tolist()
 df['gamma'] = gamma.tolist()
@@ -223,6 +256,9 @@ df['f_hertz_interp'] = df.apply(lambda x: np.interp(x.approach_interp, x.approac
 df['f_jkr_interp'] = df.apply(lambda x: np.interp(-x.withdraw_interp, -x.withdraw, x.f_jkr), axis=1)
 
 
+df['approach'][8]'''
+
+
 # ## Initial df - plots
 
 # In[8]:
@@ -230,17 +266,17 @@ df['f_jkr_interp'] = df.apply(lambda x: np.interp(-x.withdraw_interp, -x.withdra
 
 # plot all entries naively
 # i: row index; row: data of each row in series format
-for i, row in df.iterrows():
+'''for i, row in df.iterrows():
     #alpha: transparency
     plt.plot(row['approach'], row['f_hertz'], color='blue', alpha=0.1)
     plt.plot(row['withdraw'], row['f_jkr'], color='red', alpha=0.1)
 #add labels
-plt.xlabel('Displacement')
-plt.ylabel('Force')
+plt.xlabel('Displacement (nm)')
+plt.ylabel('Force (nN)')
 # invert x axis
 # plt.axis() returns (xmin, xmax, ymin, ymax)
 ax = plt.axis()
-plt.axis((ax[1],ax[0],ax[2],ax[3]))
+plt.axis((ax[1],ax[0],ax[2],ax[3]))'''
 
 
 # In[9]:
@@ -250,10 +286,10 @@ plt.axis((ax[1],ax[0],ax[2],ax[3]))
     # set_index: sets 'E' as the index (so the right value of E is assigned to the correct rows after the explode)
     # Series.explode: 'explodes' the arrays (disp and force) into different rows (scalars in each cell instead of arrays)
     # reset_index: because E is no longer needed as an index
-df2 = df.set_index(['E', 'gamma']).apply(pd.Series.explode).reset_index()
+'''df2 = df.set_index(['E', 'gamma']).apply(pd.Series.explode).reset_index()
 ax = sns.lineplot(data=df2, x='approach_interp', y='f_hertz_interp', palette='Set1', errorbar='sd', color='blue')
 ax = sns.lineplot(data=df2, x='withdraw_interp', y='f_jkr_interp',  palette='Set2', errorbar='sd', color = 'orange')
-ax.invert_xaxis()
+ax.invert_xaxis()'''
 
 
 # ## Initial df - Mapping E
@@ -263,12 +299,12 @@ ax.invert_xaxis()
 
 # map random values to a 2D array
 #transforms E from array to matrix
-E_map = np.reshape(E, (res, res))
+'''E_map = np.reshape(E, (res, res))
 gamma_map = np.reshape(gamma, (res, res))
 # Young's modulus and surface energy random maps
 fig, axes = plt.subplots(1,2, figsize=(12,5))
 sns.heatmap(E_map, cmap='viridis', ax=axes[0])
-sns.heatmap(gamma_map, cmap='viridis', ax=axes[1])
+sns.heatmap(gamma_map, cmap='viridis', ax=axes[1])'''
 #NOTE: examples at https://seaborn.pydata.org/examples/index.html
 
 
@@ -277,11 +313,11 @@ sns.heatmap(gamma_map, cmap='viridis', ax=axes[1])
 
 #check reshape rule.
 # create sequential integers array of size 9
-v = np.arange(0, 9, 1, dtype=int)
+'''v = np.arange(0, 9, 1, dtype=int)
 # reshape to 3x3
 vmap = np.reshape(v, (3, 3))
 # print array
-sns.heatmap(vmap, cmap='viridis')
+sns.heatmap(vmap, cmap='viridis')'''
 #NOTE: reshape rule is row-major, i.e. the first index is the row index. The second index is the column index.
 
 
@@ -292,23 +328,23 @@ sns.heatmap(vmap, cmap='viridis')
 
 #dataframe with contact-only data
 #df_hc: hertz contact
-df_hc = pd.DataFrame()
-df_hc['approach_contact'] = df['approach'].apply(lambda x: x[x>=0])
-df_hc['f_hertz_contact'] = df['f_hertz'].apply(lambda x: x[len(no_contact)-1:])
+'''df_hc = pd.DataFrame()
+df_hc['approach_contact'] = df['approach'].apply(lambda x: x[x>0]) # Para considerar o 0: x>=0
+df_hc['f_hertz_contact'] = df['f_hertz'].apply(lambda x: x[len(no_contact):]) # len(no_contact)-1
 df_hc['E_hertz'] = df['E']
 #df_hc['appproach_contact'] = df.apply(lambda x: x.approach[x.approach>=0], axis=1)
 #check size of disp and force vectors
-print(df_hc['approach_contact'][0].shape, df_hc['f_hertz_contact'][0].shape)
+print(df_hc['approach_contact'][0].shape, df_hc['f_hertz_contact'][0].shape, df_hc['approach_contact'][0])'''
 
 
 # ### Inputs and labels
 
-# In[13]:
+# In[1]:
 
 
-x_hc = np.array(df_hc[['approach_contact', 'f_hertz_contact']])
+'''x_hc = np.array(df_hc[['approach_contact', 'f_hertz_contact']])
 y_hc = np.array(df_hc['E_hertz'])
-print(x_hc.shape, y_hc.shape)
+print(x_hc.shape, y_hc.shape)'''
 
 
 # ### Splitting with train_test_split()
@@ -316,7 +352,7 @@ print(x_hc.shape, y_hc.shape)
 # In[14]:
 
 
-test_ratio = 0.15
+'''test_ratio = 0.15
 # (!!!) validation ratio is currently given in relation to the entire dataset (!!!!)
 valid_ratio = 0.15 
 rnd_state = 42
@@ -352,7 +388,7 @@ ax[0].hist(y_train, 20)
 ax[1].hist(y_test, 20)
 ax[2].hist(y_valid, 20)
 
-x_train.shape, x_valid.shape, x_test.shape, y_train.shape, x_train
+x_train.shape, x_valid.shape, x_test.shape, y_train.shape, x_train'''
 
 
 # ## ML
@@ -370,12 +406,12 @@ def tensor_input_shape(nparray):
     n_pts = len(nparray[0,0])
     torch_tensor = torch.zeros(size=(n_samples, n_pts, 2))
     for i in range(n_samples):
-        aux_nparray = np.hstack((nparray[i,0].reshape((n_pts,1)), nparray[i,1].reshape((n_pts,1))))
+        aux_nparray = np.hstack((np.array(nparray[i,0]).reshape((n_pts,1)), np.array(nparray[i,1]).reshape((n_pts,1))))
         aux_ttensor = torch.from_numpy(aux_nparray).type(torch.float)
         torch_tensor[i,:,:] = aux_ttensor
     return torch_tensor
 
-x_train_t = tensor_input_shape(x_train)
+'''x_train_t = tensor_input_shape(x_train)
 x_valid_t = tensor_input_shape(x_valid)
 x_test_t = tensor_input_shape(x_test)
 y_train_t = torch.from_numpy(y_train).type(torch.float).unsqueeze(dim=1)
@@ -383,7 +419,7 @@ y_valid_t = torch.from_numpy(y_valid).type(torch.float).unsqueeze(dim=1)
 y_test_t = torch.from_numpy(y_test).type(torch.float).unsqueeze(dim=1)
 #x_train_t2 = torch.from_numpy(x_train).type(torch.float)
 
-x_train_t.shape, y_train_t.shape
+x_train_t.shape, y_train_t.shape'''
 
 
 # In[16]:
@@ -451,15 +487,18 @@ def plot_error_hist(error_list, test: bool, **kwargs):
   plt.figure()
   x_values = [2.5, 10]
   error_values = list(kwargs.values())
-  ax.hist(error_list, bins=10, density=True, ec='black', range=(0,20)) # to remove outliers, set parameter 'range='
+  ax.hist(error_list, bins=20, density=True, ec='black', range=(0,15)) # to remove outliers, set parameter 'range='
   ax.set_xlabel("Error (\%)")
   ax.set_ylabel("Density")
+  # ylim between 0 and 0.215
+  ax.set_ylim([0, 0.215])
   #plt.gca().yaxis.set_major_formatter(PercentFormatter(1)) # set y axis as %
   ax.yaxis.set_major_formatter(PercentFormatter(1))
   if test:
     ax.axvline(x_values[0], color='red', linestyle='--', label=f'{error_values[0]*100: .1f}\% of curves with $\epsilon<2.5\%$')
     ax.axvline(x_values[1], color='green', linestyle='--', label=f'{error_values[1]*100: .1f}\% of curves with $\epsilon<10\%$')
-    ax.legend(loc='center', ncol=2, bbox_to_anchor=(0.5, 1.05))
+    ax.legend(loc='center', ncol=2, bbox_to_anchor=(0.5, 1.05), fontsize=13)
+    ax.text(0.76, 0.95, f'Num. of tested curves: {len(error_list)}', transform=ax.transAxes, fontsize=12, ha='center', bbox=dict(boxstyle='round', facecolor='white', edgecolor='black'))
     # ax.set_title("Test error")
     fig.savefig('error_hist_test.pdf')
   else:
@@ -473,23 +512,24 @@ def plot_bad_curves(verror_list, list_inputs, list_labels, test: bool):
     for i in range(5-len(bad_curves)):
         bad_curves.append(all_curves_sorted[len(bad_curves)+i])
   plt.figure()
-  for i, _ in bad_curves:
-    tensor_idx = i//len(list_inputs[0])
-    tensor_fts, tensor_labels = list_inputs[tensor_idx], list_labels[tensor_idx]
-    plt.plot(tensor_fts[i-tensor_idx*len(list_inputs[0]),:,0].numpy(),
-             tensor_fts[i-tensor_idx*len(list_inputs[0]),:,1].numpy(),
-             alpha=0.75,
-             label=f'E={round(tensor_labels[i-tensor_idx*len(list_inputs[0])].item(),3)}, $\epsilon$={verror_list[i]: .2f}\%')
+  for j, (i, _) in enumerate(bad_curves):
+    if j < 5:
+      tensor_idx = i//len(list_inputs[0])
+      tensor_fts, tensor_labels = list_inputs[tensor_idx], list_labels[tensor_idx]
+      plt.plot(tensor_fts[i-tensor_idx*len(list_inputs[0]),:,0].numpy(),
+              tensor_fts[i-tensor_idx*len(list_inputs[0]),:,1].numpy(),
+              alpha=0.75,
+              label=f'E={round(tensor_labels[i-tensor_idx*len(list_inputs[0])].item(),1)}kPa, $\epsilon$={verror_list[i]: .2f}\%')
   
-  plt.xlabel('Displacement')
-  plt.ylabel('Force')
+  plt.xlabel('Indentation (nm)', fontsize=14)
+  plt.ylabel('Force (nN)', fontsize=14)
   plt.legend()
   ax = plt.axis()
   plt.axis((ax[1],ax[0],ax[2],ax[3]))
   if test:
-    plt.savefig('bad_curves_test.pdf')
+    plt.savefig('bad_curves_test.pdf', bbox_inches='tight')
   else:
-    plt.savefig('bad_curves_valid.pdf')
+    plt.savefig('bad_curves_valid.pdf', bbox_inches='tight')
 
 def plot_pred_real_curves(verror_list, list_inputs, list_labels, test: bool, list_predicts, nu, r):
   bad_curves = []
@@ -514,20 +554,22 @@ def plot_pred_real_curves(verror_list, list_inputs, list_labels, test: bool, lis
     ax.plot(x,
              y1,
              alpha=0.75,
-             label='$E_{Real}$'+f'={round(tensor_labels[i-tensor_idx*len(list_inputs[0])].item(),3)}, $\epsilon$={verror_list[i]: .2f} \%',
+             label='$E_{Real}$'+f'={round(tensor_labels[i-tensor_idx*len(list_inputs[0])].item(),1)} kPa, $\epsilon$={verror_list[i]: .1f} \%',
              color=colors[j], linestyle=line_styles[0])
     ax.plot(x,
              y2,
              color=colors[j], linestyle=line_styles[1])
-    color_legend = ax.legend()
+    color_legend = ax.legend(fontsize=14)
   dummy_lines = []
   for k in range(2):
       dummy_lines.append(ax.plot([],[], c="black", ls = line_styles[k])[0])
-  bbox_y = [0.85, 0.79, 0.73]
-  linestyle_legend = plt.legend([dummy_lines[i] for i in [0,1]], ["Real curve", "Predicted Curve"], loc=7, bbox_to_anchor=(1.,bbox_y[len(bad_curves)-1]))
+  bbox_y = [0.75, 0.69, 0.64]
+  linestyle_legend = plt.legend([dummy_lines[i] for i in [0,1]], ["Real curve", "Predicted Curve"], 
+                                loc=7, bbox_to_anchor=(1.,bbox_y[len(bad_curves)-1]),
+                                fontsize=14)
   # line_legend = ax.legend(loc='right')
-  plt.xlabel('Displacement')
-  plt.ylabel('Force')
+  plt.xlabel('Indentation (nm)', fontsize=14)
+  plt.ylabel('Force (nN)', fontsize=14)
   # plt.legend()
   ax.add_artist(color_legend)
   ax.add_artist(linestyle_legend)
@@ -540,9 +582,9 @@ def plot_pred_real_curves(verror_list, list_inputs, list_labels, test: bool, lis
   ax2 = ax.axis()
   ax.axis((ax2[1],ax2[0],ax2[2],ax2[3]))
   if test:
-    fig.savefig('test_pred_vs_real_curves.pdf')
+    fig.savefig('test_pred_vs_real_curves.pdf', bbox_inches='tight')
   else:
-    fig.savefig('valid_pred_vs_real_curves.pdf') 
+    fig.savefig('valid_pred_vs_real_curves.pdf', bbox_inches='tight')
 
 def error_fn(predict_tensor, label_tensor):
   '''
@@ -574,9 +616,9 @@ class Hertz_Dataset():
 # In[18]:
 
 
-train_data = Hertz_Dataset(x_train_t, y_train_t)
+'''train_data = Hertz_Dataset(x_train_t, y_train_t)
 test_data = Hertz_Dataset(x_test_t, y_test_t)
-valid_data = Hertz_Dataset(x_valid_t, y_valid_t)
+valid_data = Hertz_Dataset(x_valid_t, y_valid_t)'''
 
 
 # In[19]:
@@ -586,23 +628,23 @@ valid_data = Hertz_Dataset(x_valid_t, y_valid_t)
 ### Re-run the cells where the model class and the model_params dict are defined ###
 
 # HYPERPARAMETERS
-LEARNING_RATE = 0.001
-EPOCHS = 20
+'''LEARNING_RATE = 2e-5
+EPOCHS = 200
 BATCH_SIZE = 32
 
 # Size of each layer
 HIDDEN_UNITS_1 = 512
 HIDDEN_UNITS_2 = 256
 
-ARCHITECTURE = 1
+ARCHITECTURE = 1'''
 
 
 # In[20]:
 
 
-train_loader=DataLoader(train_data,batch_size=BATCH_SIZE,shuffle=True)
-test_loader=DataLoader(test_data,batch_size=int(test_ratio*size+1),shuffle=False)
-valid_loader=DataLoader(valid_data, batch_size=int(valid_ratio*size+1), shuffle=False)
+'''train_loader=DataLoader(train_data, batch_size=BATCH_SIZE,shuffle=True)
+test_loader=DataLoader(test_data, batch_size=int(test_ratio*size+1),shuffle=False)
+valid_loader=DataLoader(valid_data, batch_size=int(valid_ratio*size+1), shuffle=False)'''
 
 
 # ### Regression Model
@@ -612,20 +654,42 @@ valid_loader=DataLoader(valid_data, batch_size=int(valid_ratio*size+1), shuffle=
 
 # Define the linear regression model
 class Regression_Hertz(nn.Module):
-    def __init__(self, input_shape, HIDDEN_UNITS_1, HIDDEN_UNITS_2):
+    def __init__(self, input_shape, HIDDEN_UNITS_1, HIDDEN_UNITS_2, HIDDEN_UNITS_3):
         super(Regression_Hertz, self).__init__()
         input_size = input_shape[0] * input_shape[1]
         self.layers = nn.Sequential(nn.Flatten(),
                                     nn.Linear(input_size, HIDDEN_UNITS_1),
-                                    nn.ReLU(),
+                                    nn.LeakyReLU(), # Change model parameters and in draft.py
                                     nn.Linear(HIDDEN_UNITS_1,HIDDEN_UNITS_2),
-                                    nn.ReLU(),
-                                    nn.Linear(HIDDEN_UNITS_2, 1))
+                                    nn.LeakyReLU(),
+                                    nn.Linear(HIDDEN_UNITS_2, HIDDEN_UNITS_3),
+                                    nn.LeakyReLU(),
+                                    nn.Linear(HIDDEN_UNITS_3, 1))
+
     def forward(self, x):
         out = self.layers(x)
         return out
+    
+'''nn.LeakyReLU(),
+nn.Linear(HIDDEN_UNITS_3, 1)'''
+
+'''class Regression_Hertz(nn.Module):
+    def __init__(self, input_shape, HIDDEN_UNITS_1, HIDDEN_UNITS_2, HIDDEN_UNITS_3):
+        super(Regression_Hertz, self).__init__()
+        input_size = input_shape[0] * input_shape[1]
+        self.layers = nn.Sequential(nn.Flatten(),
+                                    nn.Linear(input_size, HIDDEN_UNITS_1),
+                                    nn.LeakyReLU(), # Change model parameters and in draft.py
+                                    nn.Linear(HIDDEN_UNITS_1,HIDDEN_UNITS_2),
+                                    nn.LeakyReLU(),
+                                    nn.Linear(HIDDEN_UNITS_2,HIDDEN_UNITS_3),
+                                    nn.LeakyReLU(),
+                                    nn.Linear(HIDDEN_UNITS_3, 1))
+    def forward(self, x):
+        out = self.layers(x)
+        return out'''
 # Define input shape
-input_shape = x_train_t.shape[1:]
+'''input_shape = x_train_t.shape[1:]
 
 # Instantiate the model
 torch.manual_seed(42)
@@ -633,14 +697,14 @@ model_Hertz = Regression_Hertz(input_shape, HIDDEN_UNITS_1, HIDDEN_UNITS_2)
 
 # Define the loss function and optimizer
 loss_fn = nn.MSELoss()
-optimizer = torch.optim.SGD(model_Hertz.parameters(), 
-                            lr=LEARNING_RATE)
+optimizer = torch.optim.Adam(model_Hertz.parameters(), 
+                            lr=LEARNING_RATE)'''
 
 
 # In[22]:
 
 
-def train_one_epoch(epoch_index, train_loader): # (epoch_index, tb_writer)
+'''def train_one_epoch(epoch_index, train_loader): # (epoch_index, tb_writer)
     # running_loss = 0.
     # last_loss = 0.
     loss_list = []
@@ -661,13 +725,13 @@ def train_one_epoch(epoch_index, train_loader): # (epoch_index, tb_writer)
         error_list.append(error)
         # running_loss += loss.item()  # .item() converts tensor to number
         # print(i, loss.item())
-    return loss_list, error_list
+    return loss_list, error_list'''
 
 
 # In[23]:
 
 
-model_params = {'Epochs': EPOCHS, 
+'''model_params = {'Epochs': EPOCHS, 
                 'Learning Rate': LEARNING_RATE,
                 'Batch Size': BATCH_SIZE,
                 'Number of Hidden layers': 2,
@@ -680,14 +744,15 @@ model_params = {'Epochs': EPOCHS,
                 'Loss function': loss_fn,
                 'Optimizer': optimizer,
                 'nu': nu,
-                'radius': r}
-model_params
+                'radius': r,
+                'xmax': xmax}
+model_params'''
 
 
 # In[24]:
 
 
-def train_model_Hertz(EPOCHS: int,
+'''def train_model_Hertz(EPOCHS: int,
                       model_Hertz,
                       train_loader,
                       valid_loader,
@@ -761,43 +826,79 @@ def train_model_Hertz(EPOCHS: int,
     torch.save(x_test_t, 'x_test_t.pt')
     torch.save(y_test_t, 'y_test_t.pt')
     data_as_pkl(dataset_list)
-    os.chdir(initial_wd)
+    os.chdir(initial_wd)'''
 
 
 # In[25]:
 
 
-train_model_Hertz(EPOCHS, model_Hertz, train_loader, valid_loader, loss_fn, optimizer, x_test_t, y_test_t, dataset)
+# train_model_Hertz(EPOCHS, model_Hertz, train_loader, valid_loader, loss_fn, optimizer, x_test_t, y_test_t, dataset)
 
 
 # # **JKR**
 
-# In[26]:
+# In[ ]:
 
 
 #dataframe with contact-only data
 #df_jkr: dataframe for jkr data
-df_jkr = pd.DataFrame()
-df_jkr['withdraw_contact'] = df['withdraw'].apply(lambda x: x[x>=0])
-df_jkr['f_jkr_contact'] = df['f_jkr'].apply(lambda x: x[:-(len(no_contact)-1)])
-df_jkr['E_jkr'] = df['E']
-df_jkr['gamma_jkr'] = df['gamma']
+'''df_jkr = pd.DataFrame()
+df_jkr['withdraw_contact'] = df['withdraw'].copy().apply(lambda x: x[x>=0])
+df_jkr['f_jkr_contact'] = df['f_jkr'].copy().apply(lambda x: x[:-(len(no_contact)-1)])
+df_jkr['E_jkr'] = df['E'].copy()
+df_jkr['gamma_jkr'] = df['gamma'].copy()
 
 #check size of disp and force vectors
-print(df_jkr['withdraw_contact'][0].shape, df_jkr['f_jkr_contact'][0].shape)
+print(df_jkr['withdraw_contact'][0].shape, df_jkr['f_jkr_contact'][0].shape)'''
+
+
+# In[ ]:
+
+
+'''def get_mean_std(series: pd.Series):
+    return series.mean(), series.std()
+
+def get_max_min(series: pd.Series):
+    return series.max(), series.min()
+
+def normalize(x, min, max):
+    return (x-min)/(max-min)
+
+def unnormalize(x, min, max):
+    return min + x*(max-min)
+
+get_mean_std(df_jkr['E_jkr']), get_mean_std(df_jkr['gamma_jkr']), get_max_min(df_jkr['E_jkr']), get_max_min(df_jkr['gamma_jkr'])'''
+
+
+# In[ ]:
+
+
+'''e_max, e_min = get_max_min(df_jkr['E_jkr'])
+gamma_max, gamma_min = get_max_min(df_jkr['gamma_jkr'])
+
+
+
+df_jkr_norm = pd.DataFrame()
+df_jkr_norm = df_jkr.copy().drop(['E_jkr', 'gamma_jkr'], axis=1)'''
+'''df_jkr_norm['E_jkr_norm'] = df_jkr['E_jkr'].copy().apply(lambda x: normalize(x, e_min, e_max))
+df_jkr_norm['gamma_jkr_norm'] = df_jkr['gamma_jkr'].copy().apply(lambda x: normalize(x, gamma_min, gamma_max))'''
+
+'''df_jkr.head()'''
 
 
 # ### Train_test_validation split
 
-# In[27]:
+# In[ ]:
 
 
-test_ratio_jkr = 0.15
+'''test_ratio_jkr = 0.15
 valid_ratio_jkr = 0.15
 rnd_state_jkr = 42
+# SEE INTERSTRAT.ML_STRATIFIERS
 
 target_cols = ['E_jkr_cat', 'gamma_jkr_cat']
-nbins = 5
+nbins = 10
+
 while nbins >= 2:
     print(nbins)
     try:
@@ -816,45 +917,95 @@ while nbins >= 2:
                                              stratify=train_df_jkr[target_cols], random_state=rnd_state_jkr)
         break
     except:
+        nbins += -1'''
+
+'''while nbins >= 2:
+    print(nbins)
+    try:
+        df_jkr_norm['E_jkr_cat'] = pd.cut(df_jkr_norm['E_jkr_norm'], bins=nbins)
+        df_jkr_norm['gamma_jkr_cat'] = pd.cut(df_jkr_norm['gamma_jkr_norm'], bins=nbins)
+        train_df_jkr_norm, test_df_jkr = train_test_split(df_jkr_norm, test_size=test_ratio, 
+                                             stratify=df_jkr_norm[target_cols], random_state=rnd_state_jkr)
+        break
+    except:
         nbins += -1
 
-train_df_jkr['E_jkr'].mean(), test_df_jkr['E_jkr'].mean(), valid_df_jkr['E_jkr'].mean(), train_df_jkr['gamma_jkr'].mean(), test_df_jkr['gamma_jkr'].mean(), valid_df_jkr['gamma_jkr'].mean()
+while nbins >= 2:
+    print(nbins)
+    try:
+        train_df_jkr, valid_df_jkr = train_test_split(train_df_jkr_norm, test_size=valid_ratio_jkr/(1-test_ratio_jkr), 
+                                             stratify=train_df_jkr_norm[target_cols], random_state=rnd_state_jkr)
+        break
+    except:
+        nbins += -1'''
+
+# train_df_jkr['E_jkr'].mean(), test_df_jkr['E_jkr'].mean(), valid_df_jkr['E_jkr'].mean(), train_df_jkr['gamma_jkr'].mean(), test_df_jkr['gamma_jkr'].mean(), valid_df_jkr['gamma_jkr'].mean()
 
 
-# In[28]:
+# In[ ]:
 
 
-fig, ax = plt.subplots(2, 3, figsize=(12,8))
+# train_df_jkr.head()
+
+
+# In[ ]:
+
+
+'''fig, ax = plt.subplots(2, 3, figsize=(12,8))
 dens = True
 if dens:
     fig.supylabel('Density')
 else:
     fig.supylabel('Frequency')
     
-xlabel_list_jkr = ['E_train', 'E_test', 'E_valid',
-                  '$\gamma$_train', '$\gamma$_test', '$\gamma$_valid']
+xlabel_list_jkr = ['$E_{train}$', '$E_{test}$', '$E_{valid}$',
+                  '$\gamma_{train}$', '$\gamma_{test}$', '$\gamma_{valid}$']
 for ix, sp in enumerate(ax.flat):
     sp.set_xlabel(xlabel_list_jkr[ix])
 
-ax[0,0].hist(train_df_jkr['E_jkr'],10, density=dens)
-ax[0,1].hist(test_df_jkr['E_jkr'], 10, density=dens)
-ax[0,2].hist(valid_df_jkr['E_jkr'], 10, density=dens)
-ax[1,0].hist(train_df_jkr['gamma_jkr'], 10, density=dens)
-ax[1,1].hist(test_df_jkr['gamma_jkr'], 10, density=dens)
-ax[1,2].hist(valid_df_jkr['gamma_jkr'], 10, density=dens)
+ax[0,0].hist(train_df_jkr['E_jkr_norm'].copy().apply(lambda x: unnormalize(x, e_min, e_max)),10, density=dens)
+ax[0,1].hist(test_df_jkr['E_jkr_norm'].copy().apply(lambda x: unnormalize(x, e_min, e_max)), 10, density=dens)
+ax[0,2].hist(valid_df_jkr['E_jkr_norm'].copy().apply(lambda x: unnormalize(x, e_min, e_max)), 10, density=dens)
+ax[1,0].hist(train_df_jkr['gamma_jkr_norm'].copy().apply(lambda x: unnormalize(x, gamma_min, gamma_max)), 10, density=dens)
+ax[1,1].hist(test_df_jkr['gamma_jkr_norm'].copy().apply(lambda x: unnormalize(x, gamma_min, gamma_max)), 10, density=dens)
+ax[1,2].hist(valid_df_jkr['gamma_jkr_norm'].copy().apply(lambda x: unnormalize(x, gamma_min, gamma_max)), 10, density=dens)'''
 
+
+
+# In[ ]:
+
+
+'''fig, ax = plt.subplots(2, 3, figsize=(12,8))
+dens = True
+if dens:
+    fig.supylabel('Density')
+else:
+    fig.supylabel('Frequency')
+    
+xlabel_list_jkr = ['$E_{train}$', '$E_{test}$', '$E_{valid}$',
+                  '$\gamma_{train}$', '$\gamma_{test}$', '$\gamma_{valid}$']
+for ix, sp in enumerate(ax.flat):
+    sp.set_xlabel(xlabel_list_jkr[ix])
+
+ax[0,0].hist(train_df_jkr['E_jkr_norm'],10, density=dens)
+ax[0,1].hist(test_df_jkr['E_jkr_norm'], 10, density=dens)
+ax[0,2].hist(valid_df_jkr['E_jkr_norm'], 10, density=dens)
+ax[1,0].hist(train_df_jkr['gamma_jkr_norm'], 10, density=dens)
+ax[1,1].hist(test_df_jkr['gamma_jkr_norm'], 10, density=dens)
+ax[1,2].hist(valid_df_jkr['gamma_jkr_norm'], 10, density=dens)'''
 
 
 # ### Defining inputs and labels for train_test_vali dataframes
 # 
 # df -> np.arrays
 
-# In[29]:
+# In[ ]:
 
 
-jkr_df_list = [train_df_jkr, test_df_jkr, valid_df_jkr]
+'''jkr_df_list = [train_df_jkr, test_df_jkr, valid_df_jkr]
 ft_cols = ['withdraw_contact', 'f_jkr_contact']
-lb_cols = ['E_jkr', 'gamma_jkr']
+# lb_cols = ['E_jkr_norm', 'gamma_jkr_norm']
+lb_cols = ['gamma_jkr', 'E_jkr']
 dataset_jkr_list = []
 
 for _, df in enumerate(jkr_df_list):
@@ -865,13 +1016,13 @@ for _, df in enumerate(jkr_df_list):
 
 x_train_jkr, y_train_jkr, x_test_jkr, y_test_jkr, x_valid_jkr, y_valid_jkr = dataset_jkr_list
 
-x_train_jkr.shape, y_train_jkr.shape, x_test_jkr.shape, y_test_jkr.shape, x_valid_jkr.shape, y_valid_jkr.shape
+x_train_jkr.shape, y_train_jkr.shape, x_test_jkr.shape, y_test_jkr.shape, x_valid_jkr.shape, y_valid_jkr.shape'''
 
 
-# In[30]:
+# In[ ]:
 
 
-x_train_t_jkr = tensor_input_shape(x_train_jkr)
+'''x_train_t_jkr = tensor_input_shape(x_train_jkr)
 x_valid_t_jkr = tensor_input_shape(x_valid_jkr)
 x_test_t_jkr = tensor_input_shape(x_test_jkr)
 y_train_t_jkr = torch.from_numpy(y_train_jkr).type(torch.float)
@@ -879,10 +1030,10 @@ y_valid_t_jkr = torch.from_numpy(y_valid_jkr).type(torch.float)
 y_test_t_jkr = torch.from_numpy(y_test_jkr).type(torch.float)
 #x_train_t2 = torch.from_numpy(x_train).type(torch.float)
 
-x_train_t_jkr.shape, y_train_t_jkr.shape, y_valid_t_jkr.shape, y_test_t_jkr.shape
+x_train_t_jkr.shape, y_train_t_jkr.shape, y_valid_t_jkr.shape, y_test_t_jkr.shape'''
 
 
-# In[31]:
+# In[ ]:
 
 
 class JKR_Dataset():
@@ -898,22 +1049,30 @@ class JKR_Dataset():
     return self.features[idx],self.labels[idx]
 
 
-# In[32]:
+# In[ ]:
 
 
-train_data_jkr = JKR_Dataset(x_train_t_jkr, y_train_t_jkr)
+'''train_data_jkr = JKR_Dataset(x_train_t_jkr, y_train_t_jkr)
 test_data_jkr = JKR_Dataset(x_test_t_jkr, y_test_t_jkr)
-valid_data_jkr = JKR_Dataset(x_valid_t_jkr, y_valid_t_jkr)
+valid_data_jkr = JKR_Dataset(x_valid_t_jkr, y_valid_t_jkr)'''
+
+'''# Normalized dataset for training
+E_max, E_min = get_max_min(df_jkr['E_jkr'])
+gamma_max, gamma_min = get_max_min(df_jkr['gamma_jkr'])
+max_tensor = torch.tensor([E_max, gamma_max], dtype=torch.float32)
+min_tensor = torch.tensor([E_min, gamma_min], dtype=torch.float32)
+y_train_t_jkr_norm = (y_train_t_jkr-min_tensor)/(max_tensor-min_tensor)
+train_data_jkr_norm = JKR_Dataset(x_train_t_jkr, y_train_t_jkr_norm)'''
 
 
-# In[33]:
+# In[ ]:
 
 
 ################ After changing one of the hyperparameters: ########################
 ### Re-run the cells where the model class and the model_params dict are defined ###
 
 # HYPERPARAMETERS
-LEARNING_RATE_JKR = 0.001
+'''LEARNING_RATE_JKR = 0.0001
 EPOCHS_JKR = 100
 BATCH_SIZE_JKR = 128
 
@@ -921,18 +1080,20 @@ BATCH_SIZE_JKR = 128
 HIDDEN_UNITS_1_JKR = 512
 HIDDEN_UNITS_2_JKR = 256
 
-ARCHITECTURE_JKR = 1
+ARCHITECTURE_JKR = 1'''
 
 
-# In[34]:
+# In[ ]:
 
 
-train_loader_jkr=DataLoader(train_data_jkr,batch_size=BATCH_SIZE_JKR,shuffle=True)
+'''train_loader_jkr=DataLoader(train_data_jkr,batch_size=BATCH_SIZE_JKR,shuffle=True)
 test_loader_jkr=DataLoader(test_data_jkr,batch_size=int(test_ratio_jkr*size+1),shuffle=False)
-valid_loader_jkr=DataLoader(valid_data_jkr, batch_size=int(valid_ratio_jkr*size+1), shuffle=False)
+valid_loader_jkr=DataLoader(valid_data_jkr, batch_size=int(valid_ratio_jkr*size+1), shuffle=False)'''
+
+# train_loader_jkr_norm=DataLoader(train_data_jkr_norm,batch_size=BATCH_SIZE_JKR,shuffle=True)
 
 
-# In[35]:
+# In[ ]:
 
 
 # Define the linear regression model
@@ -952,23 +1113,65 @@ class Regression_JKR(nn.Module):
         out = self.layers(x)
         return out
 # Define input shape
-input_shape_jkr = x_train_t_jkr.shape[1:]
+'''input_shape_jkr = x_train_t_jkr.shape[1:]
 
 # Instantiate the model
 torch.manual_seed(42)
 model_jkr = Regression_JKR(input_shape_jkr, HIDDEN_UNITS_1_JKR, HIDDEN_UNITS_2_JKR)
 
+
+# Experimentar Huber Loss, log-cosh e quantile loss !!!!!!!!!!
 # Define the loss function and optimizer
 loss_fn_jkr = nn.MSELoss(reduction='none')
 # loss_fn_jkr = nn.MSELoss()
+# loss_fn_jkr = nn.L1Loss(reduction='none')
+
 optimizer_jkr = torch.optim.SGD(model_jkr.parameters(),
-                                lr=LEARNING_RATE_JKR)
+                                lr=LEARNING_RATE_JKR)'''
 
 
-# In[36]:
+# In[ ]:
 
 
-class NMSELoss(nn.Module):
+# Define the linear regression model
+class Regression_JKR_norm(nn.Module):
+    def __init__(self, input_shape, HIDDEN_UNITS_1_JKR, HIDDEN_UNITS_2_JKR):
+        super(Regression_JKR_norm, self).__init__()
+        input_size = input_shape[0] * input_shape[1]
+        self.layers = nn.Sequential(nn.Flatten(),
+                                    nn.Linear(input_size, HIDDEN_UNITS_1_JKR),
+                                    nn.ReLU(),
+                                    nn.Linear(HIDDEN_UNITS_1_JKR,HIDDEN_UNITS_2_JKR),
+                                    nn.ReLU(),
+                                    nn.Linear(HIDDEN_UNITS_2_JKR,64),
+                                    nn.ReLU(),
+                                    nn.Linear(64, 2),
+                                    nn.BatchNorm1d(2))
+    def forward(self, x):
+        out = self.layers(x)
+        return out
+# Define input shape
+'''input_shape_jkr = x_train_t_jkr.shape[1:]
+
+# Instantiate the model
+torch.manual_seed(42)
+model_jkr_norm = Regression_JKR_norm(input_shape_jkr, HIDDEN_UNITS_1_JKR, HIDDEN_UNITS_2_JKR)
+
+# Define the loss function and optimizer
+# loss_fn_jkr_norm = nn.MSELoss(reduction='none')
+# loss_fn_jkr_norm = nn.MSELoss()
+loss_fn_jkr_norm = nn.L1Loss(reduction='none')
+
+optimizer_jkr_norm = torch.optim.SGD(model_jkr_norm.parameters(),
+                                lr=LEARNING_RATE_JKR)'''
+
+
+# In[ ]:
+
+
+# Custom loss functions
+
+'''class NMSELoss(nn.Module):
     def __init__(self):
         super(NMSELoss, self).__init__()
         # self.mse = nn.MSELoss()
@@ -989,13 +1192,13 @@ class NMSELoss(nn.Module):
 
         return nmse
     
-criterion_jkr = NMSELoss()
+criterion_jkr = NMSELoss()'''
 
 
-# In[37]:
+# In[ ]:
 
 
-model_params_jkr = {'Epochs': EPOCHS_JKR, 
+'''model_params_jkr = {'Epochs': EPOCHS_JKR, 
                 'Learning Rate': LEARNING_RATE_JKR,
                 'Batch Size': BATCH_SIZE_JKR,
                 'Number of Hidden layers': 2,
@@ -1006,14 +1209,14 @@ model_params_jkr = {'Epochs': EPOCHS_JKR,
                 'Hidden Units 2': HIDDEN_UNITS_2_JKR,
                 'Input shape': list(input_shape_jkr),
                 'Loss function': loss_fn_jkr,
-                'Optimizer': optimizer_jkr}
+                'Optimizer': optimizer_jkr}'''
 # model_params_jkr
 
 
-# In[38]:
+# In[ ]:
 
 
-def train_one_epoch_jkr(epoch_index, train_loader): # (epoch_index, tb_writer)
+'''def train_one_epoch_jkr(epoch_index, train_loader): # (epoch_index, tb_writer)
     # running_loss = 0.
     # last_loss = 0.
     loss_list = []
@@ -1025,8 +1228,8 @@ def train_one_epoch_jkr(epoch_index, train_loader): # (epoch_index, tb_writer)
         optimizer_jkr.zero_grad()
         predicts = model_jkr(inputs)
         # Compute the loss and its gradients
-        '''max, _ = loss_fn_jkr(predicts, labels).max(0)
-        loss = (loss_fn_jkr(predicts, labels)/max).mean()'''
+        max, _ = loss_fn_jkr(predicts, labels).max(0)
+        loss = (loss_fn_jkr(predicts, labels)/max).mean()
         error_E, _ = error_fn(predicts[:,0].unsqueeze(dim=1), labels[:,0].unsqueeze(dim=1))
         error_gamma, _ = error_fn(predicts[:,1].unsqueeze(dim=1), labels[:,1].unsqueeze(dim=1))
         loss1, loss2 = loss_fn_jkr(predicts[:,0], labels[:,0]), loss_fn_jkr(predicts[:,1], labels[:,1])
@@ -1040,10 +1243,10 @@ def train_one_epoch_jkr(epoch_index, train_loader): # (epoch_index, tb_writer)
         error_gamma_list.append(error_gamma)
         # running_loss += loss.item()  # .item() converts tensor to number
         # print(i, loss.item())
-    return loss_list, error_E_list, error_gamma_list
+    return loss_list, error_E_list, error_gamma_list'''
 
 
-# In[39]:
+# In[ ]:
 
 
 def train_model_JKR(EPOCHS: int,
@@ -1126,17 +1329,17 @@ def train_model_JKR(EPOCHS: int,
     data_as_pkl(dataset_list)
     os.chdir(initial_wd)
 
-
-# In[40]:
+# In[ ]:
 
 
 # train_model_JKR(EPOCHS_JKR, model_jkr, train_loader_jkr, valid_loader_jkr, loss_fn_jkr, optimizer_jkr, x_test_t_jkr, y_test_t_jkr, dataset_jkr_list)
 
 
-# In[41]:
+# In[ ]:
 
 
-for i in range(1000):
+'''loss_epoch, error_E_epoch, error_gamma_epoch = [], [], []
+for i in range(1):
     loss_list = []
     error_E_list = []
     error_gamma_list = []
@@ -1147,18 +1350,25 @@ for i in range(1000):
         predicts = model_jkr(inputs)
         # Compute the loss and its gradients
         loss = loss_fn_jkr(predicts, labels).mean(dim=0)
-        '''if i == 0:
+        # loss = criterion_jkr(predicts, labels)
+        # For MAE:
+        loss = loss_fn_jkr(predicts, labels)
+        loss = loss/labels
+        loss = loss.mean(dim=0)
+        if i == 0:
             max_loss, _ = loss_fn_jkr(predicts, labels).max(0)
             max_loss = max_loss.detach()
-        loss = (loss_fn_jkr(predicts, labels)/max_loss).mean()'''
-        '''loss1, loss2 = loss_fn_jkr(predicts[:,0], labels[:,0]), loss_fn_jkr(predicts[:,1], labels[:,1])
-        loss = loss1 + loss2'''
-        '''loss1, loss2 = loss_fn_jkr(predicts[:,0], labels[:,0]), loss_fn_jkr(predicts[:,1], labels[:,1])
-        loss = loss1 * loss2'''
-        # media Loss_E, 
+        loss = (loss_fn_jkr(predicts, labels)/max_loss).mean()
+        loss1, loss2 = loss_fn_jkr(predicts[:,0], labels[:,0]), loss_fn_jkr(predicts[:,1], labels[:,1])
+        loss = loss1 + 100*loss2
+        loss1, loss2 = loss_fn_jkr(predicts[:,0], labels[:,0]), loss_fn_jkr(predicts[:,1], labels[:,1])
+        loss = loss1 * loss2
+        # real_predicts = unnormalize(predicts, torch.tensor([e_min, gamma_min]), torch.tensor([e_max, gamma_max]))
+        # real_labels = unnormalize(labels, torch.tensor([e_min, gamma_min]), torch.tensor([e_max, gamma_max]))
         error_E, _ = error_fn(predicts[:,0].unsqueeze(dim=1), labels[:,0].unsqueeze(dim=1))
         error_gamma, _ = error_fn(predicts[:,1].unsqueeze(dim=1), labels[:,1].unsqueeze(dim=1))
         loss.backward(gradient=torch.tensor([1., 1.]))
+        # loss.backward()
         # Adjust learning weights
         optimizer_jkr.step()
         # Gather data and report
@@ -1166,65 +1376,91 @@ for i in range(1000):
         loss_list.append(loss)
         error_E_list.append(error_E)
         error_gamma_list.append(error_gamma)
-        # running_loss += loss.item()  # .item() converts tensor to number
-        # print(i, loss.item())'''
-    
-    # overall_loss_list.append(sum(loss_list)/len(loss_list))
-    # overall_error_E_list.append(sum(error_E_list)/len(error_E_list))
-    # overall_error_gamma_list.append(sum(error_gamma_list)/len(error_gamma_list))
+    loss_epoch.append(sum(loss_list)/len(loss_list))
+    error_E_epoch.append(sum(error_E_list)/len(error_E_list))
+    error_gamma_epoch.append(sum(error_gamma_list)/len(error_gamma_list))'''
 
 
 # In[ ]:
 
 
-predicts[:8, :], labels[:8, :]
+'''loss_epoch, error_E_epoch, error_gamma_epoch = [], [], []
+for i in range(1000):
+    loss_list = []
+    error_E_list = []
+    error_gamma_list = []
+    for i, data in enumerate(train_loader_jkr):
+        # Every data instance is an input + label pair
+        inputs, labels = data
+        optimizer_jkr_norm.zero_grad()
+        predicts = model_jkr_norm(inputs)
+        # Compute the loss and its gradients
+        loss = loss_fn_jkr_norm(predicts, labels).mean(dim=0)
+        # loss = abs(loss-labels)/labels
+        # loss = loss.mean(dim=0)
+        error_E, _ = error_fn(predicts[:,0].unsqueeze(dim=1), labels[:,0].unsqueeze(dim=1))
+        error_gamma, _ = error_fn(predicts[:,1].unsqueeze(dim=1), labels[:,1].unsqueeze(dim=1))
+        loss.backward(gradient=torch.tensor([1., 1.]))
+        # loss.backward()
+        # Adjust learning weights
+        optimizer_jkr_norm.step()
+        # Gather data and report
+        # loss_list.append(loss.item())
+        loss_list.append(loss)
+        error_E_list.append(error_E)
+        error_gamma_list.append(error_gamma)
+    loss_epoch.append(sum(loss_list)/len(loss_list))
+    error_E_epoch.append(sum(error_E_list)/len(error_E_list))
+    error_gamma_epoch.append(sum(error_gamma_list)/len(error_gamma_list))'''
 
 
 # In[ ]:
 
 
-error_E, error_gamma
+'''predicts[:8, :], labels[:8, :]'''
 
 
 # In[ ]:
 
 
-loss.mean(), loss, loss_list[0].mean(), loss_list[0]
+'''labels[:,0].min(), labels[:,0].max(), labels[:,0].mean(), labels[:,1].min(), labels[:,1].max(), labels[:,1].mean()
 
 
 # In[ ]:
 
 
-# overall_loss_list[-1], overall_loss_list[0]
+loss_epoch[0], loss_epoch[-1], error_E_epoch[0], error_E_epoch[-1], min(error_E_epoch), error_gamma_epoch[0], error_gamma_epoch[-1], min(error_gamma_epoch)
 
 
 # In[ ]:
 
 
-# overall_error_E_list[-1], overall_error_E_list[0], overall_error_gamma_list[-1], overall_error_gamma_list[0]
+loss_epoch[0], loss_epoch[-1]'''
 
 
 # In[ ]:
 
 
-# min(overall_loss_list), min(overall_error_E_list), min(overall_error_gamma_list)
+'''fig, (ax1, ax2) = plt.subplots(1,2, figsize=(8,4))
+ax1.set_xlabel('Epoch')
+ax1.set_ylabel('Error (\%)')
+ax1.set_title('E')
+ax1.plot(error_E_epoch)
+ax2.set_xlabel('Epoch')
+ax2.set_ylabel('Error (\%)')
+ax2.set_title('$\gamma$')
+ax2.plot(error_gamma_epoch)'''
 
 
 # In[ ]:
 
 
-inputs, labels
+'''plt.plot(error_gamma_epoch)
+plt.title('$\gamma$ - Error vs epoch')
 
 
 # In[ ]:
 
 
-p = model_jkr(inputs)
-p
-
-
-# In[ ]:
-
-
-
+loss_epoch'''
 
